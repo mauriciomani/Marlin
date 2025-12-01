@@ -28,8 +28,6 @@
 #include "../shared/Marduino.h"
 #include <pinmapping.h>
 
-#define NO_COMPILE_TIME_PWM
-
 #define SET_DIR_INPUT(IO)     Gpio::setDir(IO, 1)
 #define SET_DIR_OUTPUT(IO)    Gpio::setDir(IO, 0)
 
@@ -46,7 +44,7 @@
  *
  * Now you can simply SET_OUTPUT(STEP); WRITE(STEP, HIGH); WRITE(STEP, LOW);
  *
- * Why double up on these macros? see https://gcc.gnu.org/onlinedocs/cpp/Stringification.html
+ * Why double up on these macros? see http://gcc.gnu.org/onlinedocs/cpp/Stringification.html
  */
 
 /// Read a pin

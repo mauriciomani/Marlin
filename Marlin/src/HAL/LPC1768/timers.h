@@ -1,9 +1,8 @@
 /**
  * Marlin 3D Printer Firmware
- * Copyright (c) 2020 MarlinFirmware [https://github.com/MarlinFirmware/Marlin]
  *
- * Based on Sprinter and grbl.
- * Copyright (c) 2011 Camiel Gubbels / Erik van der Zalm
+ * Copyright (c) 2020 MarlinFirmware [https://github.com/MarlinFirmware/Marlin]
+ * Copyright (c) 2016 Bob Cousins bobcousins42@googlemail.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,7 +56,7 @@
 #define _HAL_TIMER_ISR(T)  __HAL_TIMER_ISR(T)
 
 typedef uint32_t hal_timer_t;
-#define HAL_TIMER_TYPE_MAX 0xFFFFFFFFUL
+#define HAL_TIMER_TYPE_MAX 0xFFFFFFFF
 
 #define HAL_TIMER_RATE         ((F_CPU) / 4)  // frequency of timers peripherals
 
@@ -171,4 +170,4 @@ FORCE_INLINE static void HAL_timer_isr_prologue(const uint8_t timer_num) {
   }
 }
 
-inline void HAL_timer_isr_epilogue(const uint8_t) {}
+#define HAL_timer_isr_epilogue(T) NOOP

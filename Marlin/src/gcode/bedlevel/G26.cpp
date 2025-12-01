@@ -58,10 +58,10 @@
  *
  *   L #  Layer       Layer height. (Height of nozzle above bed)  If not specified .20mm will be used.
  *
- *   O #  Ooze        How much your nozzle will Ooooze filament while getting in position to print. If not
- *                    specified, a filament length of .3mm is assumed. This might be overkill, but this
- *                    parameter ensures the very first 'circle' is perfect (providing an ideal trophy to hang
- *                    up to show off your perfectly calibrated Mesh).
+ *   O #  Ooooze      How much your nozzle will Ooooze filament while getting in position to print. This
+ *                    is over kill, but using this parameter will let you get the very first 'circle' perfect
+ *                    so you have a trophy to peel off of the bed and hang up to show how perfectly you have your
+ *                    Mesh calibrated. If not specified, a filament length of .3mm is assumed.
  *
  *   P #  Prime       Prime the nozzle with specified length of filament. If this parameter is not
  *                    given, no prime action will take place. If the parameter specifies an amount, that much
@@ -102,7 +102,7 @@
 #define G26_OK false
 #define G26_ERR true
 
-#include "../gcode.h"
+#include "../../gcode/gcode.h"
 #include "../../feature/bedlevel/bedlevel.h"
 
 #include "../../MarlinCore.h"
@@ -132,11 +132,11 @@
 #endif
 
 #ifndef G26_XY_FEEDRATE
-  #define G26_XY_FEEDRATE (PLANNER_XY_FEEDRATE_MM_S / 3.0)
+  #define G26_XY_FEEDRATE (PLANNER_XY_FEEDRATE() / 3.0)
 #endif
 
 #ifndef G26_XY_FEEDRATE_TRAVEL
-  #define G26_XY_FEEDRATE_TRAVEL (PLANNER_XY_FEEDRATE_MM_S / 1.5)
+  #define G26_XY_FEEDRATE_TRAVEL (PLANNER_XY_FEEDRATE() / 1.5)
 #endif
 
 #if CROSSHAIRS_SIZE >= INTERSECTION_CIRCLE_RADIUS
@@ -162,15 +162,15 @@ float g26_random_deviation = 0.0;
    */
   bool user_canceled() {
     if (!ui.button_pressed()) return false; // Return if the button isn't pressed
-    LCD_MESSAGE_MAX(MSG_G26_CANCELED);
-    ui.quick_feedback();
+    ui.set_status(GET_TEXT_F(MSG_G26_CANCELED), 99);
+    TERN_(HAS_MARLINUI_MENU, ui.quick_feedback());
     ui.wait_for_release();
     return true;
   }
 
 #endif
 
-void move_to(const float rx, const float ry, const float z, const float e_delta) {
+void move_to(const_float_t rx, const_float_t ry, const_float_t z, const_float_t e_delta) {
   static float last_z = -999.99;
 
   const xy_pos_t dest = { rx, ry };
@@ -196,7 +196,7 @@ void move_to(const float rx, const float ry, const float z, const float e_delta)
   prepare_internal_move_to_destination(fr_mm_s);
 }
 
-void move_to(const xyz_pos_t &where, const float de) { move_to(where.x, where.y, where.z, de); }
+void move_to(const xyz_pos_t &where, const_float_t de) { move_to(where.x, where.y, where.z, de); }
 
 typedef struct {
   float extrusion_multiplier  = EXTRUSION_MULTIPLIER,
@@ -268,10 +268,8 @@ typedef struct {
 
     // If the end point of the line is closer to the nozzle, flip the direction,
     // moving from the end to the start. On very small lines the optimization isn't worth it.
-    if (dist_end < dist_start && (INTERSECTION_CIRCLE_RADIUS) < ABS(line_length)) {
-      print_line_from_here_to_there(e, s);
-      return;
-    }
+    if (dist_end < dist_start && (INTERSECTION_CIRCLE_RADIUS) < ABS(line_length))
+      return print_line_from_here_to_there(e, s);
 
     // Decide whether to retract & lift
     if (dist_start > 2.0) retract_lift_move(s);
@@ -323,9 +321,11 @@ typedef struct {
     #if HAS_HEATED_BED
 
       if (bed_temp > 25) {
-        LCD_MESSAGE_MAX(MSG_G26_HEATING_BED);
-        ui.quick_feedback();
-        TERN_(HAS_MARLINUI_MENU, ui.capture());
+        #if HAS_WIRED_LCD
+          ui.set_status(GET_TEXT_F(MSG_G26_HEATING_BED), 99);
+          ui.quick_feedback();
+          TERN_(HAS_MARLINUI_MENU, ui.capture());
+        #endif
         thermalManager.setTargetBed(bed_temp);
 
         // Wait for the temperature to stabilize
@@ -340,16 +340,20 @@ typedef struct {
     #endif // HAS_HEATED_BED
 
     // Start heating the active nozzle
-    LCD_MESSAGE_MAX(MSG_G26_HEATING_NOZZLE);
-    ui.quick_feedback();
+    #if HAS_WIRED_LCD
+      ui.set_status(GET_TEXT_F(MSG_G26_HEATING_NOZZLE), 99);
+      ui.quick_feedback();
+    #endif
     thermalManager.setTargetHotend(hotend_temp, active_extruder);
 
     // Wait for the temperature to stabilize
     if (!thermalManager.wait_for_hotend(active_extruder, true OPTARG(G26_CLICK_CAN_CANCEL, true)))
       return G26_ERR;
 
-    ui.reset_status();
-    ui.completion_feedback();
+    #if HAS_WIRED_LCD
+      ui.reset_status();
+      ui.quick_feedback();
+    #endif
 
     return G26_OK;
   }
@@ -367,7 +371,7 @@ typedef struct {
 
       if (prime_flag == -1) {  // The user wants to control how much filament gets purged
         ui.capture();
-        LCD_MESSAGE_MAX(MSG_G26_MANUAL_PRIME);
+        ui.set_status(GET_TEXT_F(MSG_G26_MANUAL_PRIME), 99);
         ui.chirp();
 
         destination = current_position;
@@ -394,15 +398,17 @@ typedef struct {
 
         ui.wait_for_release();
 
-        LCD_MESSAGE_MAX(MSG_G26_PRIME_DONE);
+        ui.set_status(GET_TEXT_F(MSG_G26_PRIME_DONE), 99);
         ui.quick_feedback();
         ui.release();
       }
       else
     #endif
     {
-      LCD_MESSAGE_MAX(MSG_G26_FIXED_LENGTH);
-      ui.quick_feedback();
+      #if HAS_WIRED_LCD
+        ui.set_status(GET_TEXT_F(MSG_G26_FIXED_LENGTH), 99);
+        ui.quick_feedback();
+      #endif
       destination = current_position;
       destination.e += prime_length;
       prepare_internal_move_to_destination(fr_slow_e);
@@ -503,10 +509,8 @@ void GcodeSuite::G26() {
   // or if the parameter parsing did not go OK, abort
   if (homing_needed_error()) return;
 
-  #if HAS_TOOLCHANGE
-    // Change the tool first, if specified
-    if (parser.seenval('T')) tool_change(parser.value_int());
-  #endif
+  // Change the tool first, if specified
+  if (parser.seenval('T')) tool_change(parser.value_int());
 
   g26_helper_t g26;
 
@@ -534,7 +538,7 @@ void GcodeSuite::G26() {
 
     if (bedtemp) {
       if (!WITHIN(bedtemp, 40, BED_MAX_TARGET)) {
-        SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified bed temperature not plausible (40-", BED_MAX_TARGET, "C)."));
+        SERIAL_ECHOLNPGM("?Specified bed temperature not plausible (40-", BED_MAX_TARGET, "C).");
         return;
       }
       g26.bed_temp = bedtemp;
@@ -545,7 +549,7 @@ void GcodeSuite::G26() {
   if (parser.seenval('L')) {
     g26.layer_height = parser.value_linear_units();
     if (!WITHIN(g26.layer_height, 0.0, 2.0)) {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified layer height not plausible."));
+      SERIAL_ECHOLNPGM("?Specified layer height not plausible.");
       return;
     }
   }
@@ -554,12 +558,12 @@ void GcodeSuite::G26() {
     if (parser.has_value()) {
       g26.retraction_multiplier = parser.value_float();
       if (!WITHIN(g26.retraction_multiplier, 0.05, 15.0)) {
-        SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified Retraction Multiplier not plausible."));
+        SERIAL_ECHOLNPGM("?Specified Retraction Multiplier not plausible.");
         return;
       }
     }
     else {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Retraction Multiplier must be specified."));
+      SERIAL_ECHOLNPGM("?Retraction Multiplier must be specified.");
       return;
     }
   }
@@ -567,7 +571,7 @@ void GcodeSuite::G26() {
   if (parser.seenval('S')) {
     g26.nozzle = parser.value_float();
     if (!WITHIN(g26.nozzle, 0.1, 2.0)) {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified nozzle size not plausible."));
+      SERIAL_ECHOLNPGM("?Specified nozzle size not plausible.");
       return;
     }
   }
@@ -577,7 +581,7 @@ void GcodeSuite::G26() {
       #if HAS_MARLINUI_MENU
         g26.prime_flag = -1;
       #else
-        SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Prime length must be specified when not using an LCD."));
+        SERIAL_ECHOLNPGM("?Prime length must be specified when not using an LCD.");
         return;
       #endif
     }
@@ -585,7 +589,7 @@ void GcodeSuite::G26() {
       g26.prime_flag++;
       g26.prime_length = parser.value_linear_units();
       if (!WITHIN(g26.prime_length, 0.0, 25.0)) {
-        SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified prime length not plausible."));
+        SERIAL_ECHOLNPGM("?Specified prime length not plausible.");
         return;
       }
     }
@@ -594,7 +598,7 @@ void GcodeSuite::G26() {
   if (parser.seenval('F')) {
     g26.filament_diameter = parser.value_linear_units();
     if (!WITHIN(g26.filament_diameter, 1.0, 4.0)) {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified filament size not plausible."));
+      SERIAL_ECHOLNPGM("?Specified filament size not plausible.");
       return;
     }
   }
@@ -617,8 +621,8 @@ void GcodeSuite::G26() {
 
   // If any preset or temperature was specified
   if (noztemp) {
-    if (!WITHIN(noztemp, 165, thermalManager.hotend_max_target(active_extruder))) {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified nozzle temperature not plausible."));
+    if (!WITHIN(noztemp, 165, (HEATER_0_MAXTEMP) - (HOTEND_OVERSHOOT))) {
+      SERIAL_ECHOLNPGM("?Specified nozzle temperature not plausible.");
       return;
     }
     g26.hotend_temp = noztemp;
@@ -632,19 +636,19 @@ void GcodeSuite::G26() {
   }
 
   // Get repeat from 'R', otherwise do one full circuit
-  grid_count_t g26_repeats;
+  int16_t g26_repeats;
   #if HAS_MARLINUI_MENU
     g26_repeats = parser.intval('R', GRID_MAX_POINTS + 1);
   #else
     if (parser.seen('R'))
       g26_repeats = parser.has_value() ? parser.value_int() : GRID_MAX_POINTS + 1;
     else {
-      SERIAL_ECHOLNPGM(GCODE_ERR_MSG("(R)epeat must be specified when not using an LCD."));
+      SERIAL_ECHOLNPGM("?(R)epeat must be specified when not using an LCD.");
       return;
     }
   #endif
   if (g26_repeats < 1) {
-    SERIAL_ECHOLNPGM(GCODE_ERR_MSG("(R)epeat value not plausible; must be at least 1."));
+    SERIAL_ECHOLNPGM("?(R)epeat value not plausible; must be at least 1.");
     return;
   }
 
@@ -652,7 +656,7 @@ void GcodeSuite::G26() {
   g26.xy_pos.set(parser.seenval('X') ? RAW_X_POSITION(parser.value_linear_units()) : current_position.x,
                  parser.seenval('Y') ? RAW_Y_POSITION(parser.value_linear_units()) : current_position.y);
   if (!position_is_reachable(g26.xy_pos)) {
-    SERIAL_ECHOLNPGM(GCODE_ERR_MSG("Specified X,Y coordinate out of bounds."));
+    SERIAL_ECHOLNPGM("?Specified X,Y coordinate out of bounds.");
     return;
   }
 
@@ -663,7 +667,7 @@ void GcodeSuite::G26() {
 
   do_z_clearance(Z_CLEARANCE_BETWEEN_PROBES);
 
-  #if HAS_VOLUMETRIC_EXTRUSION
+  #if DISABLED(NO_VOLUMETRICS)
     bool volumetric_was_enabled = parser.volumetric_enabled;
     parser.volumetric_enabled = false;
     planner.calculate_volumetric_multipliers();
@@ -711,7 +715,7 @@ void GcodeSuite::G26() {
       #error "A_CNT must be a positive value. Please change A_INT."
     #endif
     float trig_table[A_CNT];
-    for (uint8_t i = 0; i < A_CNT; ++i)
+    LOOP_L_N(i, A_CNT)
       trig_table[i] = INTERSECTION_CIRCLE_RADIUS * cos(RADIANS(i * A_INT));
 
   #endif // !ARC_SUPPORT
@@ -785,7 +789,7 @@ void GcodeSuite::G26() {
 
         g26.recover_filament(destination);
 
-        { REMEMBER(fr, feedrate_mm_s, PLANNER_XY_FEEDRATE_MM_S * 0.1f);
+        { REMEMBER(fr, feedrate_mm_s, PLANNER_XY_FEEDRATE() * 0.1f);
           plan_arc(endpoint, arc_offset, false, 0);  // Draw a counter-clockwise arc
           destination = current_position;
         }
@@ -849,14 +853,14 @@ void GcodeSuite::G26() {
   } while (--g26_repeats && location.valid());
 
   LEAVE:
-  LCD_MESSAGE_MIN(MSG_G26_LEAVING);
+  ui.set_status(GET_TEXT_F(MSG_G26_LEAVING), -1);
   TERN_(EXTENSIBLE_UI, ExtUI::onMeshUpdate(location, ExtUI::G26_FINISH));
 
   g26.retract_filament(destination);
   destination.z = Z_CLEARANCE_BETWEEN_PROBES;
   move_to(destination, 0);                                   // Raise the nozzle
 
-  #if HAS_VOLUMETRIC_EXTRUSION
+  #if DISABLED(NO_VOLUMETRICS)
     parser.volumetric_enabled = volumetric_was_enabled;
     planner.calculate_volumetric_multipliers();
   #endif
