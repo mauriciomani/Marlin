@@ -1,4 +1,4 @@
-# V1CNC_Skr1p3_Dual_2209 - 2.1.1 - 515D
+# V1CNC_Skr1p4_Dual_2209 - 2.1.1 - 515D
 
 ### Preconfigured V1 Engineering firmware.
 
@@ -12,9 +12,9 @@ This firmware has been automatically configured based on scripts from the
 - Configured for CNC
 - Custom LCD commands
 - Configured to use 32 microsteps
-- Configured for Skr v1.3
+- Configured for Skr v1.4
 - Configured for dummy extruder
 - Configured for TMC2209
 - Configured for REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER
 - Configured for Dual XY
-- Configured for Skr v1.3 dual
+- Configured for Skr v1.4 dual
