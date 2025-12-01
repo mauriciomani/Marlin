@@ -18,3 +18,6 @@ This firmware has been automatically configured based on scripts from the
 - Configured for REPRAP_DISCOUNT_FULL_GRAPHIC_SMART_CONTROLLER
 - Configured for Dual XY
 - Configured for Skr v1.4 dual
+- Bed leveling
+- Reduce homing feedrate X: 12*60, Y: 12*60
+- Implement FYSETC_MINI_12864_2_1
